@@ -14,7 +14,14 @@ logger = logging.getLogger(__name__)
 Vector = Dict[str, float]
 
 @dataclass
+class SearchResult: 
+    doc_id: int
+    score: float
+    text: str
 
+
+
+@dataclass
 class SearchEngine:
     _docs: List[str] = field(default_factory=list) # List of documents in the search engine example: ["Document 1 text", "Document 2 text", ...]    
     _docs_tokens: List[List[str]] = field(default_factory=list) # List of tokenized documents, where each document is represented as a list of tokens. Example: [["token1", "token2"], ["token3", "token4"], ...]
@@ -118,4 +125,18 @@ class SearchEngine:
             return numerator / denominator
         
 
+    def search(self, query, top_k: int = 5, *, min_score: float = 0.0) -> List[SearchResult]:
+        if self._dirty:
+            self._rebuild()
         
+        query_tokens = tokenize(query)
+        query_vector = self._vectorize(query_tokens)
+
+        results = []
+        for doc_id, doc_vector in zip(self._doc_ids, self._doc_vectors):
+            score = self.cosine_similarity(query_vector, doc_vector)
+            if score >= min_score:
+                results.append(SearchResult(doc_id=doc_id, score=score, text=self._docs[doc_id]))
+
+        results.sort(key=lambda x: x.score, reverse=True)
+        return results[:top_k]
